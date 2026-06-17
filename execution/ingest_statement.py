@@ -40,7 +40,8 @@ def normalise_statement(path: Union[str, Path], password: Optional[str] = None) 
         import pdfplumber
 
         tables = []
-        with pdfplumber.open(str(path), password=password) as pdf:
+        pdf_password = password if password else None
+        with pdfplumber.open(str(path), password=pdf_password) as pdf:
             for page in pdf.pages:
                 extracted = page.extract_table() or []
                 tables.extend(extracted)
