@@ -4,32 +4,43 @@ from pathlib import Path
 from execution.categorise import categorise_transaction
 
 
-_FALLBACK_RULES = [
-    ("transport", ["uber", "trip"]),
-]
-
-
-def _classify(description: str) -> str:
-    category = categorise_transaction(description)
-    if category != "uncategorised":
-        return category
-    lookup = description.lower()
-    for category, keywords in _FALLBACK_RULES:
-        if any(keyword in lookup for keyword in keywords):
-            return category
-    return "uncategorised"
+def classify(description: str) -> str:
+    return categorise_transaction(description)
 
 
 def spending_summary(rows):
     categories = defaultdict(float)
     for row in rows:
         if row.get("side") == "out":
-            category = _classify(row.get("description", ""))
+            category = classify(row.get("description", ""))
             categories[category] += abs(row.get("amount", 0.0))
 
     result = {category: round(total, 2) for category, total in categories.items()}
     total_out = round(sum(result.values()), 2)
     return {"categories": result, "total_out": total_out}
+
+
+def spending_breakdown(rows):
+    totals = defaultdict(float)
+    uncategorised_ids = []
+
+    for row in rows:
+        if row.get("side") != "out":
+            continue
+
+        category = classify(row.get("description", ""))
+        totals[category] += abs(row.get("amount", 0.0))
+
+        if category == "uncategorised":
+            uncategorised_ids.append(row.get("id"))
+
+    totals_out = round(sum(totals.values()), 2)
+    return {
+        "totals": {category: round(total, 2) for category, total in totals.items()},
+        "total_out": totals_out,
+        "uncategorised_count": len(uncategorised_ids),
+        "uncategorised_transaction_ids": uncategorised_ids,
+    }
 
 
 def money_totals(rows):
@@ -50,13 +61,15 @@ def money_totals(rows):
 def build_report(rows):
     from execution.income_analysis import analyse_income
 
-    spend = spending_summary(rows)
+    spend_summary = spending_summary(rows)
+    spend_breakdown = spending_breakdown(rows)
     totals = money_totals(rows)
     income = analyse_income(rows)
     return {
         "money_in_out": totals,
         "income_analysis": income,
-        "spending_summary": spend,
+        "spending_summary": spend_summary,
+        "spending_breakdown": spend_breakdown,
     }
 
 
@@ -100,4 +113,18 @@ def render_markdown(report: dict) -> str:
         f"**Total Out:** {report.get('spending_summary', {}).get('total_out', 0):.2f}"
     )
     lines.append("")
+
+    lines.append("## Uncategorised Transactions")
+    lines.append("")
+    spend_breakdown = report.get("spending_breakdown", {})
+    uncategorised_count = spend_breakdown.get("uncategorised_count", 0)
+    uncategorised_ids = spend_breakdown.get("uncategorised_transaction_ids", [])
+    if uncategorised_count > 0 or uncategorised_ids:
+        lines.append(f"- Uncategorised Transactions: {uncategorised_count}")
+        if uncategorised_ids:
+            lines.append(f"- Uncategorised Transaction IDs: {uncategorised_ids}")
+    else:
+        lines.append("- None")
+    lines.append("")
+
     return "\n".join(lines)
