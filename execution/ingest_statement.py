@@ -9,7 +9,7 @@ import re
 _CANONICAL_COLUMNS = ["date", "description", "amount", "side"]
 
 
-def infer_side(amount: float) -> str:
+def infer_side(amount):
     return "in" if amount >= 0 else "out"
 
 
@@ -26,21 +26,51 @@ _COLUMN_RENAME_MAP = {
 
 
 def _normalise_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.rename(columns=_COLUMN_RENAME_MAP)
+    if "date" in df.columns:
+        df = df.rename(columns=_COLUMN_RENAME_MAP)
+    if "date" not in df.columns:
+        for candidate in df.columns:
+            text = str(candidate).lower()
+            if "date" in text:
+                df = df.rename(columns={candidate: "date"})
+                break
+
+    if "amount" in df.columns:
+        df = df.rename(columns=_COLUMN_RENAME_MAP)
+    if "amount" not in df.columns:
+        for candidate in df.columns:
+            text = str(candidate).lower()
+            if any(token in text for token in ["amount", "debit", "credit", "balance"]):
+                df = df.rename(columns={candidate: "amount"})
+                break
+
+    if "description" not in df.columns:
+        for candidate in df.columns:
+            text = str(candidate).lower()
+            if any(token in text for token in ["desc", "details", "narr", "memo"]):
+                df = df.rename(columns={candidate: "description"})
+                break
+
     if "date" not in df.columns:
         raise ValueError("Missing date column in parsed data")
-    if "amount" not in df.columns and "description" not in df.columns:
-        raise ValueError("Missing required transaction fields in parsed data")
+
     if "amount" not in df.columns:
         df["amount"] = 0.0
+    if "description" not in df.columns:
+        df["description"] = ""
+
     df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce").round(2)
     df = df.dropna(subset=["date", "amount"])
-    if "description" not in df.columns:
-        df["description"] = ""
-    else:
-        df["description"] = df["description"].fillna("")
+    df["description"] = df["description"].fillna("").astype(str)
     df["side"] = df["amount"].apply(infer_side)
+    return reorder_columns_safely(df)
+
+
+def reorder_columns_safely(df):
+    for column in _CANONICAL_COLUMNS:
+        if column not in df.columns:
+            df[column] = ""
     return df[_CANONICAL_COLUMNS]
 
 
@@ -50,10 +80,8 @@ def normalise_statement(path: Union[str, Path], password: Optional[str] = None) 
 
     if suffix == ".csv":
         df = pd.read_csv(path)
-
     elif suffix in (".xlsx", ".xls"):
         df = pd.read_excel(path, engine="openpyxl" if suffix == ".xlsx" else None)
-
     elif suffix == ".pdf":
         import pdfplumber
         import traceback
@@ -66,7 +94,8 @@ def normalise_statement(path: Union[str, Path], password: Optional[str] = None) 
                     extracted_text = page.extract_text()
                     if extracted_text:
                         text_pages.append(extracted_text)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
+            print(traceback.format_exc())
             raise RuntimeError(f"Failed to open PDF: {exc}") from exc
 
         full_text = "\n".join(text_pages)
@@ -77,7 +106,6 @@ def normalise_statement(path: Union[str, Path], password: Optional[str] = None) 
         if not rows:
             return pd.DataFrame(columns=_CANONICAL_COLUMNS)
         df = pd.DataFrame(rows)
-
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
 
@@ -115,10 +143,9 @@ def _build_combined_pattern():
 
 
 def _parse_amount_token(raw: str) -> float:
-    text = raw.strip()
+    text = raw.strip().replace(",", "")
     if text.startswith("(") and ")" in text:
         text = "-" + text.strip("()")
-    text = text.replace(",", "")
     return float(text)
 
 
