@@ -25,7 +25,9 @@ SUPPORTED_TYPES = ["csv", "xlsx", "xls", "pdf"]
 
 def main() -> None:
     st.title("jjbank Dashboard")
-    st.markdown("Upload a bank statement (CSV, XLSX, PDF) to analyse money in/out, recurring depositors, missing payments, and spending breakdown.")
+    st.markdown(
+        "Upload a bank statement (CSV, XLSX, PDF) to analyse money in/out, recurring depositors, missing payments, and spending breakdown."
+    )
 
     with st.sidebar:
         uploaded = st.file_uploader("Statement file", type=SUPPORTED_TYPES)
@@ -49,6 +51,11 @@ def main() -> None:
         tmp_path = tmp.name
 
     try:
+        suffix = Path(uploaded.name).suffix.lower()
+        if suffix == ".pdf" and not password:
+            st.warning("This PDF appears to be password protected. Enter the password and click Analyse again.")
+            return
+
         statement = normalise_statement(tmp_path, password=password or None)
         if statement.empty:
             st.warning("No transactions could be parsed from this file.")

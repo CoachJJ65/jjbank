@@ -3,6 +3,7 @@ openpyxl
 pypdf
 pdfplumber
 plotly
+xlsxwriter
 streamlit
 pytest
 pytest-cov

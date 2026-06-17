@@ -20,7 +20,10 @@ def _write_xlsx(path: Path, df: pd.DataFrame) -> None:
 
 
 def _make_password_protected_pdf(path: Path, password: str) -> None:
-    import fpdf
+    try:
+        import fpdf  # noqa: F401
+    except ModuleNotFoundError:
+        pytest.skip("fpdf not installed; skipping password-protected PDF fixture test")
 
     pdf = fpdf.FPDF()
     pdf.add_page()
