@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jjbank"
+version = "0.1.0"
+description = "jjbank standalone project"
+dependencies = [
+    "pandas",
+    "openpyxl",
+    "pypdf",
+    "pdfplumber",
+    "streamlit",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+]

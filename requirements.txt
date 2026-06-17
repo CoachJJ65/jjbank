@@ -1,0 +1,7 @@
+pandas
+openpyxl
+pypdf
+pdfplumber
+streamlit
+pytest
+pytest-cov
