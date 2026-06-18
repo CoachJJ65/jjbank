@@ -58,7 +58,8 @@ def main() -> None:
 
         statement = normalise_statement(tmp_path, password=password or None)
         if statement.empty:
-            st.warning("No transactions could be parsed from this file.")
+            suffix_note = "" if suffix != ".pdf" else " If the bank statement is actually a scanned PDF, we’ll need OCR-based extraction next."
+            st.warning("No transactions could be parsed from this file." + suffix_note)
             return
         rows = statement.to_dict(orient="records")
         for row in rows:

@@ -99,7 +99,8 @@ class JjBankApp:
             return
 
         if statement.empty:
-            messagebox.showinfo("jjbank", "No transactions could be parsed.")
+            suffix_note = "" if suffix != ".pdf" else " If the bank statement is scanned image-only PDF, we’ll need OCR-based extraction next."
+            messagebox.showinfo("jjbank", "No transactions could be parsed." + suffix_note)
             return
 
         self.rows = statement.to_dict(orient="records")
